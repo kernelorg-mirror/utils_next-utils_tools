@@ -138,25 +138,25 @@ $cmd <<-EOF
 
 	show_log native perf \$log_perf
 
-	echo Building: powerpc ppc64_defconfig
-	d="$bparent/powerpc_ppc64_defconfig"
+	echo Building: arm64 defconfig
+	d="$bparent/arm64_defconfig"
 	[ -d \$d ] || mkdir \$d || exit 1
-	log_ppc=\$d.log
-	make ARCH=powerpc O=\$d -s ppc64_defconfig || exit 1
+	log_arm64=\$d.log
+	make ARCH=arm64 O=\$d -s defconfig || exit 1
 
-	if ! /usr/bin/time make ARCH=powerpc O=\$d -j200 -O -s > \$log_ppc 2>&1; then
-		do_fail "powerpc ppc64_defconfig" "\$log_ppc"
+	if ! /usr/bin/time make ARCH=arm64 O=\$d -j200 -O -s > \$log_arm64 2>&1; then
+		do_fail "arm64 defconfig" "\$log_arm64"
 	fi
 
-	show_log powerpc ppc64_defconfig \$log_ppc
+	show_log arm64 defconfig \$log_arm64
 
 	echo Building: arm multi_v7_defconfig
 	d="$bparent/arm_multi_v7_defconfig"
 	[ -d \$d ] || mkdir \$d || exit 1
 	log_arm=\$d.log
-	make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- O=\$d -s multi_v7_defconfig || exit 1
+	make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- O=\$d -s multi_v7_defconfig || exit 1
 
-	if ! /usr/bin/time make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- O=\$d -j200 -O -s > \$log_arm 2>&1; then
+	if ! /usr/bin/time make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- O=\$d -j200 -O -s > \$log_arm 2>&1; then
 		do_fail 'arm multi_v7_defconfig' "\$log_arm"
 	fi
 

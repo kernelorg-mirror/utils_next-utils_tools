@@ -33,17 +33,17 @@ $cmd <<-EOF
 		export KCONFIG_ALLCONFIG
 	fi
 
-	echo Building: powerpc allyesconfig
-	d=../powerpc_allyesconfig
+	echo Building: arm64 allyesconfig
+	d=../arm64_allyesconfig
 	[ -d \$d ] || mkdir \$d
 	e=\$d.except
 	echo CONFIG_LD_DEAD_CODE_DATA_ELIMINATION=n >\$e
 	if [ -r \$g ]; then
 		cat \$g >>\$e
 	fi
-	KCONFIG_ALLCONFIG=\$e make ARCH=powerpc -s O=\$d allyesconfig
+	KCONFIG_ALLCONFIG=\$e make ARCH=arm64 -s O=\$d allyesconfig
 	printf 'Backgrouding the %s build\n' 'powerpc_allyesconfig'
-	make ARCH=powerpc O=\$d -j$j_factor -O -s -k >\$d.log 2>&1 </dev/null &
+	make ARCH=arm64 O=\$d -j$j_factor -O -s -k >\$d.log 2>&1 </dev/null &
 
 	echo Building: x86_64 modules_install
 	INSTALL_MOD_PATH="${build_dir%/*}" /usr/bin/time make ARCH=x86_64 CROSS_COMPILE=x86_64-linux-gnu- O=../x86_64_allmodconfig -j$j1_factor -O -s modules_install
@@ -57,8 +57,8 @@ $cmd <<-EOF
 	echo Building: powerpc allnoconfig
 	d=../powerpc_allnoconfig
 	[ -d \$d ] || mkdir \$d
-	make ARCH=powerpc -s O=\$d allnoconfig
-	make ARCH=powerpc O=\$d -j$j1_factor -O -s
+	make ARCH=powerpc -s O=\$d CROSS_COMPILE=powerpc-linux-gnu- allnoconfig
+	make ARCH=powerpc O=\$d CROSS_COMPILE=powerpc-linux-gnu- -j$j1_factor -O -s
 
 	echo Building: powerpc64 allnoconfig
 	d=../powerpc64_allnoconfig
@@ -69,23 +69,23 @@ $cmd <<-EOF
 	if [ -r \$g ]; then
 		cat \$g >>\$e
 	fi
-	KCONFIG_ALLCONFIG=\$e make ARCH=powerpc -s O=\$d allnoconfig
+	KCONFIG_ALLCONFIG=\$e make ARCH=powerpc -s O=\$d CROSS_COMPILE=powerpc-linux-gnu- allnoconfig
 	rm \$e
-	make ARCH=powerpc O=\$d -j$j1_factor -O -s
+	make ARCH=powerpc O=\$d CROSS_COMPILE=powerpc-linux-gnu- -j$j1_factor -O -s
 
 	echo Building: powerpc ppc44x_defconfig
 	d=../powerpc_ppc44x_defconfig
 	[ -d \$d ] || mkdir \$d
-	make ARCH=powerpc -s O=\$d ppc44x_defconfig
-	make ARCH=powerpc O=\$d -j$j1_factor -O -s
+	make ARCH=powerpc -s O=\$d CROSS_COMPILE=powerpc-linux-gnu- ppc44x_defconfig
+	make ARCH=powerpc O=\$d CROSS_COMPILE=powerpc-linux-gnu- -j$j1_factor -O -s
 
 	echo Building: powerpc pseries_le_defconfig
 	d=../powerpc_pseries_le_defconfig
 	[ -d \$d ] || mkdir \$d
 	make ARCH=powerpc -s O=\$d pseries_le_defconfig
 	sed -i '/CONFIG_PPC_64K_PAGES/d;s/^.*CONFIG_PPC_4K_PAGES.*$/CONFIG_PPC_4K_PAGES=y/' \$d/.config
-	make ARCH=powerpc -s O=\$d olddefconfig
-	make ARCH=powerpc O=\$d -j$j1_factor -O -s
+	make ARCH=powerpc -s O=\$d CROSS_COMPILE=powerpc-linux-gnu- olddefconfig
+	make ARCH=powerpc O=\$d CROSS_COMPILE=powerpc-linux-gnu- -j$j1_factor -O -s
 
 	echo Building: i386 defconfig
 	d=../i386_defconfig
@@ -108,21 +108,21 @@ $cmd <<-EOF
 	echo Building: sparc64 defconfig
 	d=../sparc64_defconfig
 	[ -d \$d ] || mkdir \$d
-	cross -n -N -a sparc64 -k sparc64 -c 11.1.0 -s O=\$d defconfig
-	cross -n -N -a sparc64 -k sparc64 -c 11.1.0 O=\$d -j$j1_factor -O -s
+	make ARCH=sparc CROSS_COMPILE=sparc64-linux-gnu- -s O=\$d sparc64_defconfig
+	make ARCH=sparc CROSS_COMPILE=sparc64-linux-gnu- O=\$d -j$j1_factor -O -s
 
 	echo Building: sparc defconfig
 	d=../sparc_defconfig
 	[ -d \$d ] || mkdir \$d
-	cross -n -N -a sparc64 -k sparc -c 11.1.0 -s O=\$d defconfig
-	cross -n -N -a sparc64 -k sparc -c 11.1.0 O=\$d -j$j1_factor -O -s
+	make ARCH=sparc CROSS_COMPILE=sparc64-linux-gnu- -s O=\$d defconfig
+	make ARCH=sparc CROSS_COMPILE=sparc64-linux-gnu- O=\$d -j$j1_factor -O -s
 
-	printf '\nWaiting for powerpc allyesconfig build\n\n'
+	printf '\nWaiting for arm64 allyesconfig build\n\n'
 	wait
 
 	rm .scmversion
 
-	cat ../powerpc_allyesconfig.log
+	cat ../arm64_allyesconfig.log
 EOF
 
 exit 0
