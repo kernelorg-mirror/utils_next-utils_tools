@@ -1,0 +1,73 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+no_build=false
+[ "$1" = "-n" ] && {
+	shift
+	no_build=true
+}
+patch="$1"
+shift
+[ -f "$patch" ] || {
+	echo "patch does not exist" 1>&2
+	exit 1
+}
+
+. "$(dirname "$0")/common.sh"
+
+log()
+{
+	echo "$@" | tee -a "$LOG_FILE"
+}
+
+execute()
+{
+	log "$" "$@"
+	"$@" 2>&1 | tee -a "$LOG_FILE"
+	return "${PIPESTATUS[0]}"
+}
+
+old_head=$(git rev-parse HEAD)
+execute git am -3 "$patch" || {
+	echo "git am failed" 1>&2
+	bash -i || exit
+}
+new_head=$(git rev-parse HEAD)
+[ "$old_head" = "$new_head" ] && {
+	echo "hmmm, looks like the patch was already applied or is unneeded"
+	exit 0
+}
+[ "$(git diff "$old_head".. | wc -c)" -eq 0 ] && {
+	echo "hmmm, committed soemthing, but diff is empty" 1>&2
+	bash -i || exit
+}
+
+GIT_EDITOR=: execute git reset 'HEAD^' || {
+	echo "git reset failed" 1>&2
+	bash -i || exit
+}
+execute git add -A . || {
+	echo "git add failed" 1>&2
+	bash -i || exit
+}
+GIT_EDITOR=: execute git commit -v -a --amend || {
+	echo "git commit failed" 1>&2
+	bash -i || exit
+}
+
+$no_build && exit 0
+
+git push -f "${build_host}${build_host:+:}${build_dir}" master:refs/heads/next || {
+	echo git push failed 1>&2
+	bash -i || exit
+}
+
+"$bin_dir/do_build" || {
+	echo Build failed 1>&2
+	bash -i || exit
+}
+
+exit 0

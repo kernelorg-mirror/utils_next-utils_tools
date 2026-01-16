@@ -1,0 +1,12 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+subject="Fixes tag needs some work in the BRANCH tree"
+
+tools_dir=$(dirname "$0")
+"$tools_dir"/message_helper "$@" "$subject" </dev/null
+
+exit 0

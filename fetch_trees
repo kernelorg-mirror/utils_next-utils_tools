@@ -1,0 +1,92 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+tools_dir=$(dirname "$0")
+. "$tools_dir/common.sh" ''
+. "$tools_dir/check_dups.sh"
+
+if [ "$1" = '-n' ]; then
+	shift
+	last=$(tail -n1 "$SHA1_FILE" | cut -f1 -d"$_TAB")
+	start_from=$(get_branches | sed -n '/^'"$last"'$/{n;p;}')
+	if [ -z "$start_from" ]; then
+		exit 0
+	fi
+fi
+
+if [ "$1" = '-s' ]; then
+	shift
+	start_from="$1"
+	if [ -z "$start_from" ]; then
+		printf '-s requires a start tree\n' 1>&2
+		exit 1
+	fi
+	shift
+fi
+
+# shellcheck disable=SC2317
+fetch_git()
+{
+	local name="$1" branch="$2" old_sha="$3" new_sha
+
+	if ! new_sha=$(git ls-remote "$name" "refs/heads/$branch") ||
+	   [ -z "$new_sha" ]; then
+		printf '%s: Could not fetch %s branch %s\n' 'fetch_git' "$name" "$branch" >&2
+		printf '%s\n' "$old_sha"
+		return
+	fi
+	new_sha="${new_sha%%"${_TAB}"*}"
+	if [ "$new_sha" = "$old_sha" ]; then
+		printf '%s\n' "$old_sha"
+		return
+	fi
+	if git fetch "$name"; then
+		git rev-parse --verify "$name/$branch"
+	else
+		printf '%s\n' "$old_sha"
+	fi
+}
+
+trees="$*"
+if ! [ "$trees" ]; then
+	trees=$(get_branches)
+fi
+
+for name in $trees; do
+	if [ -n "$start_from" ]; then
+		if [ "$name" = "$start_from" ]; then
+			start_from=''
+		else
+			continue
+		fi
+	fi
+
+	type=$(get_type "$name")
+	if ! [ "$type" ]; then
+		printf '%s: unknown tree\n' "$name" 1>&2
+		continue
+	fi
+	if ! [ "$type" = 'git' ]; then
+		continue
+	fi
+
+	if [ "$(get_url "$name")" = 'linux-next' ]; then
+		continue
+	fi
+
+	printf '%s\n' "$name"
+
+	branch=$(get_remote_branch "$name")
+	old_sha=$(git rev-parse --quiet --verify "$name/$branch")
+	new_sha=$(fetch_git "$name" "$branch" "$old_sha")
+
+	check_dups "$name" origin/master "$new_sha"
+	if ! [ "$new_sha" = "$old_sha" ]; then
+		"$tools_dir"/check_commits ^origin/master "$old_sha..$new_sha"
+	fi
+done
+
+exit 0

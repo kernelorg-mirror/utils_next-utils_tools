@@ -1,0 +1,11 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+tr '\r' '\n' <merge.log |
+	grep -E -a '^(\[|  )|(git (cherry|rm|reset|checkout|quiltimport|merge --abort|rebase))|Merging|Applying|CONFLICT|Revert|Created commit|dropping' |
+	grep -E -a -v 'reset HEAD\^|^Created commit [0-9a-f]*: Merge (branch|commit)|mark the corrected paths|HEAD is now at|^\[(master|fs-next) [0-9a-f]*\] (Merge( remote(-tracking)?)? branch|[0-9]*/)|^hint:|-Revert' >summ
+
+exit 0

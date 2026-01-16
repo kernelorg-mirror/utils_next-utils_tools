@@ -1,0 +1,11 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+. "$(dirname "$0")/common.sh"
+
+git push -f "${build_host}${build_host:+:}${build_dir}" master:refs/heads/next
+
+exit $?

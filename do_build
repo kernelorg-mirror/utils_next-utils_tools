@@ -1,0 +1,178 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+tree=
+if [ "$1" ]; then
+	tree=$1
+	shift
+fi
+
+# shellcheck source=common.sh
+. "$(dirname "$0")/common.sh"
+
+set -e
+
+bparent=$(dirname "$build_dir")
+
+line=$(tail -n 1 "$SHA1_FILE")
+
+# strip everything after the first tab character
+stree=${line%%	*}
+if [ "$tree" ]; then
+	if [ "$tree" != "$stree" ]; then
+		printf 'That is not the last tree merged (%s v %s)\n' "$tree" "$stree" 1>&2
+		exit 1
+	fi
+else
+	tree="$stree"
+fi
+obdir="$bparent/old/$tree"
+
+cmd="/bin/sh"
+if [ "$build_host" ]; then
+	cmd="ssh -T $build_host"
+fi
+
+log_regex='/^[[:space:]]+$/d
+/^[.[:digit:]]+user [.[:digit:]]+system [:.[:digit:]]+elapsed [[:digit:]]+%CPU \([[:digit:]]+avgtext\+[[:digit:]]+avgdata [[:digit:]]+maxresident\)k$/d
+/^[[:digit:]]+inputs\+[[:digit:]]+outputs \([[:digit:]]+major\+[[:digit:]]+minor\)pagefaults [[:digit:]]+swaps$/d
+/^Setup is [[:digit:]]+ bytes \(padded to [[:digit:]]+ bytes\)\.$/d
+/^System is [[:digit:]]+ kB$/d
+/^CRC [[:xdigit:]]+$/d
+/^Kernel: arch\/x86\/boot\/bzImage is ready  \(#[[:digit:]]+\)$/d
+s/^(WARNING: (modpost: )?(drivers\/built-in|vmlinux)\.o\(\.[^+]*\+0x)[[:xdigit:]]+(\): Section mismatch in reference from .*)$/\1XXXX\4/
+/^Warning: Kernel ABI header at /d
+/^[[:space:]]+PERF_VERSION = /d
+s/^(Parsed description of) [[:digit:]]+ (helper function)/\1 X \2/
+s/^[[:xdigit:]]+([[:space:]]+R_PPC64_(ADDR64|REL32)[[:space:]].*)$/XXX\1/'
+
+$cmd <<-EOF
+
+	echo Building on \$(hostname)
+
+	echo \$PATH | grep -q "\$HOME/bin" || export PATH="\$HOME/bin:\$PATH"
+	export LANG=C
+
+	cd "$build_dir" || exit 1
+
+	export CCACHE_DIR="$bparent/.ccache"
+	export TMPDIR="$bparent/tmp"
+
+	git reset --hard next || exit 1
+	touch .scmversion || exit 1
+
+	g=../global.except
+	if [ -r \$g ]; then
+		KCONFIG_ALLCONFIG=\$g
+		export KCONFIG_ALLCONFIG
+	fi
+
+	[ -d "$obdir" ] || mkdir -p "$obdir" || exit 1
+
+	sanitise_log() {
+		sed -E -e '$log_regex' | grep -vxFf $bparent/log-ignore
+	}
+
+	do_fail()
+	{
+		sep='!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+		echo "\$sep"
+		echo "ERROR: \$1 build failed - log follows"
+		echo "\$sep"
+		cat "\$2"
+		if [ -n "\$3" ]; then
+			kill "\$3" || true
+		fi
+		killall make
+		rm .scmversion
+		exit 1
+	}
+
+	show_log() {
+		arch=\$1
+		conf=\$2
+		log=\$3
+
+		sep='======================================================================'
+
+		echo "\$sep"
+		echo " \$arch \$conf build OK - log follows"
+		echo "\$sep"
+		cat \$log
+		b=\$(basename \$log)
+		olen=0
+		if [ -f $obdir/\$b ]; then
+			olen=\$(sanitise_log <$obdir/\$b | wc -l)
+		fi
+		len=\$(sanitise_log <\$log | wc -l)
+		if [ \$len -gt \$olen ]; then
+			echo "\$sep"
+			echo " log \$b increased number of lines"
+			echo "\$sep"
+			linux-next-notify "\$arch \$conf log got bigger"
+			if [ -f $obdir/\$b ]; then
+				diff -u $obdir/\$b \$log 2>&1 | less
+			else
+				diff -u /dev/null \$log 2>&1 | less
+			fi
+		fi
+		if [ \$len -gt 0 ]; then
+			(sanitise_log <\$log; cat $bparent/log-ignore ) |
+				sort -u >$bparent/log-ignore.tmp
+			mv $bparent/log-ignore.tmp $bparent/log-ignore
+		fi
+		mv \$log $obdir/\$b
+	}
+
+	echo Building: perf
+	d="$bparent/perf"
+	[ -d \$d ] || mkdir \$d || exit 1
+	log_perf=\$d.log
+
+	if ! /usr/bin/time make -C tools/perf -f Makefile.perf -s -O -j200 O=\$d NO_BPF_SKEL=1 > \$log_perf 2>&1; then
+		do_fail perf "\$log_perf"
+	fi
+
+	show_log native perf \$log_perf
+
+	echo Building: powerpc ppc64_defconfig
+	d="$bparent/powerpc_ppc64_defconfig"
+	[ -d \$d ] || mkdir \$d || exit 1
+	log_ppc=\$d.log
+	make ARCH=powerpc O=\$d -s ppc64_defconfig || exit 1
+
+	if ! /usr/bin/time make ARCH=powerpc O=\$d -j200 -O -s > \$log_ppc 2>&1; then
+		do_fail "powerpc ppc64_defconfig" "\$log_ppc"
+	fi
+
+	show_log powerpc ppc64_defconfig \$log_ppc
+
+	echo Building: arm multi_v7_defconfig
+	d="$bparent/arm_multi_v7_defconfig"
+	[ -d \$d ] || mkdir \$d || exit 1
+	log_arm=\$d.log
+	make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- O=\$d -s multi_v7_defconfig || exit 1
+
+	if ! /usr/bin/time make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- O=\$d -j200 -O -s > \$log_arm 2>&1; then
+		do_fail 'arm multi_v7_defconfig' "\$log_arm"
+	fi
+
+	show_log arm multi_v7_defconfig \$log_arm
+
+	echo Building: x86_64 allmodconfig
+	d="$bparent/x86_64_allmodconfig"
+	[ -d \$d ] || mkdir \$d || exit 1
+	log_x86=\$d.log
+	make ARCH=x86_64 CROSS_COMPILE=x86_64-linux-gnu- O=\$d -s allmodconfig || exit 1
+
+	if ! /usr/bin/time make ARCH=x86_64 CROSS_COMPILE=x86_64-linux-gnu- O=\$d -j200 -O -s > \$log_x86 2>&1; then
+		do_fail "x86_64 allmodconfig" "\$log_x86"
+	fi
+
+	show_log x86_64 allmodconfig \$log_x86
+
+	rm .scmversion
+EOF

@@ -1,0 +1,99 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+_next_common_no_args=1 . "$(dirname "$0")/common.sh"
+
+# Don't do releases in the wee hours :-)
+h=$(date '+%k')
+if [ "$h" -lt 10 ] && [ "$h" -gt 4 ]; then
+	printf '%s\n' 'Go back to bed' 1>&2
+	exit 1
+fi
+
+if [ -z "$NEXT_SIGNING_KEY" ]; then
+	printf 'Environment variable NEXT_SIGNING_KEY is missing\n' 1>&2
+	exit 1
+fi
+if [ -z "$NEXT_KUP_KEY" ]; then
+	printf 'Environment variable NEXT_KUP_KEY is missing\n' 1>&2
+	exit 1
+fi
+
+# This means I get the right tag if I finish after midnight
+d=$(date --date '5 hours ago' '+%Y%m%d')
+l=$(git tag -l --sort=taggerdate 'v*' | tail -n 1)
+n="next-$d"
+
+mkdir Next
+
+(
+	tab="$_TAB$_TAB"
+
+	printf '%s\n\n' 'Trees included into this release:'
+	printf '%s%s%s\n' 'Name' "$tab" 'Url'
+	printf '%s%s%s\n' '----' "$tab" '---'
+
+	# Use get_branches "$@" if function's $1 should mean script's $1
+	# shellcheck disable=SC2119
+	for name in $(get_branches); do
+		tab="$_TAB"
+		if [ ${#name} -lt 8 ]; then
+			tab="$tab$_TAB"
+		fi
+		url=$(get_url "$name")
+		if [ "$url" = 'linux-next' ]; then
+			continue
+		fi
+		ref=$(get_remote_branch "$name")
+		url="$url#$ref"
+		printf '%s%s%s\n' "$name" "$tab" "$url"
+	done
+) >Next/Trees
+
+mv ../SHA1s Next/SHA1s
+
+grep -a -v '^Checking out files:' ../merge.log >Next/merge.log
+
+printf -- '-next-%s\n' "$d" >localversion-next
+
+git add Next localversion-next
+git commit -s -v -a -m "Add linux-next specific files for $d"
+git tag -u "$NEXT_SIGNING_KEY" -m "$n" "$n"
+
+git branch -f stable refs/remotes/origin/master
+
+p="patch-$l-$n"
+git diff-tree -p "$l.." >"../$p"
+gpg -u "$NEXT_KUP_KEY" -a -b "../$p"
+
+oldest=$(date --date '3 months ago' '+%Y%m%d')
+printf 'Removing old releases ... <= next-%s\n' "$oldest"
+
+for t in $(git tag -l 'next-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'); do
+	t=${t#next-}
+	if [ "$t" -gt "$oldest" ]; then
+		break
+	fi
+	git tag -d "next-$t"
+done
+
+printf '%s\n' 'Pushing to korg ...'
+git push --prune korg
+
+printf '%s\n' 'Pushing to korg-history ...'
+git push korg-history
+
+printf '%s\n' 'Pushing to history ...'
+git push history
+
+printf '%s\n' 'Pushing patch to kernel.org ...'
+cd ..
+xz -v -9 "$p"
+kup put "$p.xz" "$p.asc" "/pub/linux/kernel/next/$p.gz"
+
+ssh -O exit git@gitolite.kernel.org
+
+exit 0

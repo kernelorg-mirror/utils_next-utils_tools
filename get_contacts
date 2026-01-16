@@ -1,0 +1,17 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+tree=
+if [ "$1" ]; then
+        tree=$1
+        shift
+fi
+
+. "$(dirname "$0")/common.sh"
+
+get_contacts "$tree"
+
+exit 0

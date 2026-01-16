@@ -1,0 +1,11 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+git push -f korg refs/heads/fs-current:refs/heads/fs-current refs/heads/fs-next:refs/heads/fs-next
+
+ssh -O exit git@gitolite.kernel.org
+
+exit 0

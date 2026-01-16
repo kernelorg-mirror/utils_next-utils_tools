@@ -1,0 +1,43 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+no_build=false
+[ "$1" = "-n" ] && {
+	shift
+	no_build=true
+}
+
+rev=$1
+shift
+
+. "$(dirname "$0")/common.sh"
+
+log()
+{
+	echo "$@" | tee -a "$LOG_FILE"
+}
+
+execute()
+{
+	log "$" "$@"
+	"$@" 2>&1 | tee -a "$LOG_FILE"
+	return "${PIPESTATUS[0]}"
+}
+
+GIT_EDITOR=: execute git revert "$rev" || exit 1
+
+$no_build && exit 0
+
+git push -f "${build_host}${build_host:+:}${build_dir}" master:refs/heads/next || {
+	echo git push failed 1>&2
+	bash -i || exit
+}
+"$bin_dir/do_build" || {
+	echo Build failed 1>&2
+	bash -i || exit
+}
+
+exit 0

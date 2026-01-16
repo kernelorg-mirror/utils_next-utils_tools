@@ -1,0 +1,51 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+# shellcheck source=./common.sh
+. "$(dirname "$0")/common.sh" ''
+
+log="$LOG_FILE"
+if [ -f merge.log ]; then
+	log='merge.log'
+fi
+
+branch=
+kconfig=
+
+while getopts 'b:c:' opt; do
+	case "$opt" in
+	b) branch="$OPTARG" ;;
+	c) kconfig="$OPTARG" ;;
+	*) printf '%s: bad option' "$0"; exit 1 ;;
+	esac
+done
+shift $(( OPTIND - 1 ))
+
+subject="$1"
+shift
+
+cc=( 'Linux Next Mailing List <linux-next@vger.kernel.org>'
+	'Linux Kernel Mailing List <linux-kernel@vger.kernel.org>'
+	"$@" )
+
+if [ -z "$branch" ]; then
+	branch=$(grep -a '^Merging ' "$log" | grep -a -v ' version ' | tail -n 1 |
+		sed 's/^Merging \([^ /]*\).*$/\1/')
+fi
+
+contact=$(get_contacts "$branch")
+subject=${subject//BRANCH/$branch}
+filter=( -E -e 's/^([^ ])/|\1/' -e "s/BRANCH/$branch/g" )
+if [ -n "$kconfig" ]; then
+	filter+=( -e "s/KCONFIG_NAME/$kconfig/g" )
+fi
+
+{
+	printf 'Hi all,\n\n'
+	sed "${filter[@]}" | fmt -w 76 -u -p '|' | sed 's/^|//'
+} | "$bin_dir"/send_email "linux-next: $subject" "$contact" "${cc[@]}"
+
+exit 0

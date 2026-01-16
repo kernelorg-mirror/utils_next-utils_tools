@@ -1,0 +1,25 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+RM_FILES=(last_msg.bak merge.debug merge.log)
+OTHER_RM_FILES=(SHA1s.bak merge.log.bak mails/*)
+MV_FILES=(summ)
+
+# check for files that should exist before we delete anything
+for i in "${RM_FILES[@]}" "${MV_FILES[@]}"; do
+	if ! [ -e "$i" ]; then
+		printf '%s: no "%s" file\n' "$0" "$i" 1>&2
+		exit 1
+	fi
+done
+
+echo rm "${RM_FILES[@]}" "${OTHER_RM_FILES[@]}"
+rm "${RM_FILES[@]}" "${OTHER_RM_FILES[@]}"
+
+for i in "${MV_FILES[@]}"; do
+	echo mv "${i}"{,.old}
+	mv "${i}"{,.old}
+done

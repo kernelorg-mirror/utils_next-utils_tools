@@ -1,0 +1,23 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+LOG_FILE="../merge.log"
+
+log()
+{
+	echo "$@" | tee -a "$LOG_FILE"
+}
+
+execute()
+{
+	log "$" "$@"
+	"$@" 2>&1 | tee -a "$LOG_FILE"
+	return "${PIPESTATUS[0]}"
+}
+
+GIT_EDITOR=: execute git rm -f "$@" || exit 1
+
+exit 0

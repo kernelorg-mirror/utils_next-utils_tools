@@ -1,0 +1,128 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+set -u
+
+base=$1
+next=$2
+rc=$3
+
+# to stabilise the sorts
+export LANG=C
+
+sd=../stats
+
+[ -d $sd ] || mkdir $sd || {
+	echo "No stats dir" 1>&2
+	exit 1
+}
+
+git rev-list --no-merges "$base..$next" | sort >"$sd/$next".sha1s
+git rev-list --no-merges "$base..$rc" | sort >"$sd/$rc".sha1s
+
+# filter out the common commits
+comm -12 "$sd/$next".sha1s "$sd/$rc".sha1s >"$sd"/common_sha1
+comm -23 "$sd/$next".sha1s "$sd/$rc".sha1s >"$sd/$next".sha1s.1
+comm -13 "$sd/$next".sha1s "$sd/$rc".sha1s >"$sd/$rc".sha1s.1
+
+# now find commits with the same patch-id
+git diff-tree -p --stdin <"$sd/$next".sha1s.1 |
+	git patch-id |
+	sort >"$sd/$next".patch_ids
+git diff-tree -p --stdin <"$sd/$rc".sha1s.1 |
+	git patch-id |
+	sort >$"sd/$rc".patch_ids
+join -j 1 "$sd/$next".patch_ids "$sd/$rc".patch_ids >"$sd"/common_id
+join -v 1 -j 1 "$sd/$next".patch_ids "$sd/$rc".patch_ids |
+	sed 's/^.* //' >"$sd/$next".sha1s.2
+join -v 2 -j 1 "$sd/$next".patch_ids "$sd/$rc".patch_ids |
+	sed 's/^.* //' >"$sd/$rc".sha1s.2
+
+# now find commits with the same subject line
+git log --stdin --no-walk --format='%s|%H' <"$sd/$next".sha1s.2 |
+	sed 's/|\(.*\)|/_\1|/g' |
+	sort -f -k 1,1 -t '|' >"$sd/$next".subj
+git log --stdin --no-walk --format='%s|%H' <"$sd/$rc".sha1s.2 |
+	sed 's/|\(.*\)|/_\1|/g' |
+	sort -f -k 1,1 -t '|' >"$sd/$rc".subj
+join -i -j 1 -t '|' "$sd/$next".subj "$sd/$rc".subj >"$sd"/common_subj
+join -v 1 -i -j 1 -t '|' "$sd/$next".subj "$sd/$rc".subj |
+	sed 's/^.*|//' >"$sd/$next".sha1s.3
+join -v 2 -i -j 1 -t '|' "$sd/$next".subj "$sd/$rc".subj |
+	sed 's/^.*|//' >"$sd/$rc".sha1s.3
+
+nrc=$(wc -l <"$sd/$rc".sha1s)
+nnext=$(wc -l <"$sd/$next".sha1s)
+ncommsha1=$(wc -l <"$sd"/common_sha1)
+ncommid=$(wc -l <"$sd"/common_id)
+ncommsubj=$(wc -l <"$sd"/common_subj)
+ncomm=$((ncommsha1+ncommid+ncommsubj))
+pcomm=$((ncomm*100/nrc))
+
+cat <<EOF
+Hi all,
+
+As usual, the executive friendly graph is at
+http://neuling.org/linux-next-size.html :-)
+
+(No merge commits counted, $next was the first linux-next after
+the merge window opened.)
+
+EOF
+printf "%-50s %5d\n" "Commits in $rc (relative to $base):" "$nrc"
+printf "%-50s %5d\n" "Commits in $next:" "$nnext"
+printf "%-50s %5d\n" "Commits with the same SHA1:" "$ncommsha1"
+printf "%-50s %5d (1)\n" "Commits with the same patch_id:" "$ncommid"
+printf "%-50s %5d (1)\n" "Commits with the same subject line:" "$ncommsubj"
+
+cat <<EOF
+
+(1) not counting those in the lines above.
+
+EOF
+
+printf "%-50s %5d %2d%%\n" "So commits in -rc1 that were in $next:" $ncomm $pcomm
+
+cat <<EOF
+
+Some breakdown of the list of extra commits (relative to $next)
+in -rc1:
+
+Top ten first word of commit summary:
+
+$(git log --no-walk --stdin --pretty="format:%s" <"$sd/$rc".sha1s.3 |
+	sed -e 's/^\[//;s/[]:( /,;].*$//' |
+	tr '[:upper:]' '[:lower:]' | sort | uniq -c | sort -nr | head -n 10)
+
+Top ten authors:
+
+$(git log --no-walk --stdin --pretty="format:%aE" <"$sd/$rc".sha1s.3 |
+	tr '[:upper:]' '[:lower:]' | sort | uniq -c | sort -nr | head -n 10)
+
+Top ten committers:
+
+$(git log --no-walk --stdin --pretty="format:%cE" <"$sd/$rc".sha1s.3 |
+	tr '[:upper:]' '[:lower:]' | sort | uniq -c | sort -nr | head -n 10)
+
+There are also $(wc -l <"$sd/$next".sha1s.3) commits in $next that didn't make it into
+$rc.
+
+Top ten first word of commit summary:
+
+$(git log --no-walk --stdin --pretty="format:%s" <"$sd/$next".sha1s.3 |
+	sed -e 's/^\[//;s/[]:( /,;].*$//' |
+	tr '[:upper:]' '[:lower:]' | sort | uniq -c | sort -nr | head -n 10)
+
+Top ten authors:
+
+$(git log --no-walk --stdin --pretty="format:%aE" <"$sd/$next".sha1s.3 |
+	tr '[:upper:]' '[:lower:]' | sort | uniq -c | sort -nr | head -n 10)
+
+Top ten committers:
+
+$(git log --no-walk --stdin --pretty="format:%cE" <"$sd/$next".sha1s.3 |
+	tr '[:upper:]' '[:lower:]' | sort | uniq -c | sort -nr | head -n 10)
+EOF

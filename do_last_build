@@ -1,0 +1,128 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+. "$(dirname "$0")/common.sh"
+
+set -e
+
+cmd="/bin/sh"
+[ "$build_host" ] &&
+	cmd="ssh -T $build_host"
+
+j1_factor=$(( j_factor / 2 ))
+
+$cmd <<-EOF
+	set -e
+
+	echo \$PATH | grep -q "\$HOME/bin" || export PATH="\$HOME/bin:\$PATH"
+	export LANG=C
+
+	cd "$build_dir"
+
+	export CCACHE_DIR="${build_dir%/*}/.ccache"
+	export TMPDIR="${build_dir%/*}/tmp"
+
+	touch .scmversion
+
+	g=../global.except
+	if [ -r \$g ]; then
+		KCONFIG_ALLCONFIG=\$g
+		export KCONFIG_ALLCONFIG
+	fi
+
+	echo Building: powerpc allyesconfig
+	d=../powerpc_allyesconfig
+	[ -d \$d ] || mkdir \$d
+	e=\$d.except
+	echo CONFIG_LD_DEAD_CODE_DATA_ELIMINATION=n >\$e
+	if [ -r \$g ]; then
+		cat \$g >>\$e
+	fi
+	KCONFIG_ALLCONFIG=\$e make ARCH=powerpc -s O=\$d allyesconfig
+	printf 'Backgrouding the %s build\n' 'powerpc_allyesconfig'
+	make ARCH=powerpc O=\$d -j$j_factor -O -s -k >\$d.log 2>&1 </dev/null &
+
+	echo Building: x86_64 modules_install
+	INSTALL_MOD_PATH="${build_dir%/*}" /usr/bin/time make ARCH=x86_64 CROSS_COMPILE=x86_64-linux-gnu- O=../x86_64_allmodconfig -j$j1_factor -O -s modules_install
+
+	echo Building: x86_64 allnoconfig
+	d=../x86_64_allnoconfig
+	[ -d \$d ] || mkdir \$d
+	make ARCH=x86_64 O=\$d CROSS_COMPILE=x86_64-linux-gnu- -s allnoconfig
+	make ARCH=x86_64 O=\$d CROSS_COMPILE=x86_64-linux-gnu- -j$j1_factor -O -s
+
+	echo Building: powerpc allnoconfig
+	d=../powerpc_allnoconfig
+	[ -d \$d ] || mkdir \$d
+	make ARCH=powerpc -s O=\$d allnoconfig
+	make ARCH=powerpc O=\$d -j$j1_factor -O -s
+
+	echo Building: powerpc64 allnoconfig
+	d=../powerpc64_allnoconfig
+	[ -d \$d ] || mkdir \$d
+	e=\$d.except
+	echo CONFIG_PPC64=y >\$e
+	echo CONFIG_SECTION_MISMATCH_WARN_ONLY=y >>\$e
+	if [ -r \$g ]; then
+		cat \$g >>\$e
+	fi
+	KCONFIG_ALLCONFIG=\$e make ARCH=powerpc -s O=\$d allnoconfig
+	rm \$e
+	make ARCH=powerpc O=\$d -j$j1_factor -O -s
+
+	echo Building: powerpc ppc44x_defconfig
+	d=../powerpc_ppc44x_defconfig
+	[ -d \$d ] || mkdir \$d
+	make ARCH=powerpc -s O=\$d ppc44x_defconfig
+	make ARCH=powerpc O=\$d -j$j1_factor -O -s
+
+	echo Building: powerpc pseries_le_defconfig
+	d=../powerpc_pseries_le_defconfig
+	[ -d \$d ] || mkdir \$d
+	make ARCH=powerpc -s O=\$d pseries_le_defconfig
+	sed -i '/CONFIG_PPC_64K_PAGES/d;s/^.*CONFIG_PPC_4K_PAGES.*$/CONFIG_PPC_4K_PAGES=y/' \$d/.config
+	make ARCH=powerpc -s O=\$d olddefconfig
+	make ARCH=powerpc O=\$d -j$j1_factor -O -s
+
+	echo Building: i386 defconfig
+	d=../i386_defconfig
+	[ -d \$d ] || mkdir \$d
+	make ARCH=i386 O=\$d CROSS_COMPILE=x86_64-linux-gnu- -s defconfig
+	make ARCH=i386 O=\$d CROSS_COMPILE=x86_64-linux-gnu- -j$j1_factor -O -s
+
+	echo Building: arm64 defconfig
+	d=../arm64_defconfig
+	[ -d \$d ] || mkdir \$d
+	make ARCH=arm64 O=\$d CROSS_COMPILE=aarch64-linux-gnu- -s defconfig
+	make ARCH=arm64 O=\$d CROSS_COMPILE=aarch64-linux-gnu- -j$j1_factor -O -s
+
+	echo Building: s390 defconfig
+	d=../s390_defconfig
+	[ -d \$d ] || mkdir \$d
+	make ARCH=s390 O=\$d CROSS_COMPILE=s390x-linux-gnu- -s defconfig
+	make ARCH=s390 O=\$d CROSS_COMPILE=s390x-linux-gnu- -j$j1_factor -O -s
+
+	echo Building: sparc64 defconfig
+	d=../sparc64_defconfig
+	[ -d \$d ] || mkdir \$d
+	cross -n -N -a sparc64 -k sparc64 -c 11.1.0 -s O=\$d defconfig
+	cross -n -N -a sparc64 -k sparc64 -c 11.1.0 O=\$d -j$j1_factor -O -s
+
+	echo Building: sparc defconfig
+	d=../sparc_defconfig
+	[ -d \$d ] || mkdir \$d
+	cross -n -N -a sparc64 -k sparc -c 11.1.0 -s O=\$d defconfig
+	cross -n -N -a sparc64 -k sparc -c 11.1.0 O=\$d -j$j1_factor -O -s
+
+	printf '\nWaiting for powerpc allyesconfig build\n\n'
+	wait
+
+	rm .scmversion
+
+	cat ../powerpc_allyesconfig.log
+EOF
+
+exit 0

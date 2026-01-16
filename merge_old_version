@@ -1,0 +1,107 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+no_build=false
+if [ "$1" = "-n" ]; then
+	shift
+	no_build=true
+fi
+
+if [ "$1" ]; then
+	ver="next-${1#next-}"
+	shift
+fi
+
+. "$(dirname "$0")/common.sh"
+
+log()
+{
+	echo "$@" | tee -a "$LOG_FILE"
+}
+
+execute()
+{
+	log '$' "$@"
+	_out="$( "$@" 2>&1 )"
+	_err=$?
+	echo "$_out" | tee -a "$LOG_FILE"
+	return "$_err"
+}
+
+line="$(tail -n 1 "$SHA1_FILE")"
+
+# strip everything after the first tab character
+tree=${line%%	*}
+
+if [ -z "$ver" ] && [ -f "../old-versions/$tree" ]; then
+	ver=$(cat "../old-versions/$tree")
+fi
+if [ -z "$ver" ]; then
+	ver=$(git tag -l --sort=refname next-\* | tail -n 1)
+fi
+
+rev=$(git show "$ver:Next/SHA1s" | sed -n "s/^$tree\t\t*//p")
+if [ -z "$rev" ]; then
+	echo "No previous tree/date ($tree/$ver)" 1>&2
+	exit 1
+fi
+
+bad_rev=$(git rev-parse --verify 'HEAD^2')
+
+tab="\t"
+if [ "${#tree}" -lt 8 ]; then
+	tab="\t\t"
+fi
+
+# strip evrything up to the last tab character
+srev=${line##*	}
+if [ "$bad_rev" != "$srev" ]; then
+	echo "bad last line in $SHA1_FILE" 1>&2
+	exit 1
+fi
+
+if ! execute git reset --hard 'HEAD^'; then
+	echo "git reset failed" 1>&2
+	bash -i || exit
+fi
+
+log Merging "$ver version of $tree"
+if ! execute git merge -m "$ver/$tree" "$rev"; then
+	echo Merge failed 1>&2
+	echo "$ver version of $tree" >>../merge.debug
+	git diff >>../merge.debug 2>&1
+	if git diff 2>&1 | grep -E -q '<<<<<|^\*'; then
+		bash -i || exit
+	fi
+	execute git commit --no-edit -v -a
+	execute git diff -M --stat --summary 'HEAD^..'
+fi
+if [ -f "../merge-fixes/$tree" ]; then
+	while read -r p <&7; do
+		if ! "$bin_dir/merge_fix" -n "$p"; then
+			bash -i || exit
+		fi 7<&-
+	done 7<"../merge-fixes/$tree"
+fi
+
+sed -i '$d' "$SHA1_FILE"
+printf "%s$tab%s\n" "$tree" "$rev" >>"$SHA1_FILE"
+
+if ! git push -f "${build_host}${build_host:+:}${build_dir}" master:refs/heads/next; then
+	echo git push failed 1>&2
+	bash -i || exit
+fi
+
+$no_build && exit 0
+
+if ! "$bin_dir/do_build" "$tree"; then
+	echo Build failed 1>&2
+	bash -i || exit
+fi
+
+printf '%s\n' "$ver" >"$top_dir/old-versions/$tree"
+
+exit 0

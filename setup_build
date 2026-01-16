@@ -1,0 +1,29 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+. "$(dirname "$0")/common.sh"
+
+bparent=$(dirname "$build_dir")
+bdir=$(basename "$build_dir")
+
+cmd=
+[ "$build_host" ] &&
+	cmd="ssh $build_host"
+$cmd /bin/sh <<EOF
+	set -x -e
+	[ -d "$bparent" ] || mkdir -p "$bparent"
+	cd "$bparent"
+	rm -rf *config perf *config.log perf.log lib *.except
+	[ -d tmp ] || mkdir tmp
+	[ -d .ccache ] || mkdir .ccache
+	(
+		cd linus.git
+		git remote update origin || true
+	)
+	rm -rf "$bdir"
+	git clone -s -l -c gc.auto=0 linus.git "$bdir"
+	cp /dev/null log-ignore
+EOF

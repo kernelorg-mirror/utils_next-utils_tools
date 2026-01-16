@@ -1,0 +1,96 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+branch=()
+if [ "$1" = '-b' ]; then
+        branch=( -b "$2" )
+        shift 2
+fi
+
+gitk --merge -- "$@" &
+
+tools_dir=$(dirname "$0")
+
+hc=()
+mc=()
+cc=()
+cformat='%(trailers:only=no,valueonly,unfold,key=signed-off-by)%aN <%aE>%n%cN <%cE>'
+
+read -r -a head_commits -p 'HEAD commit(s): '
+for c in "${head_commits[@]}"; do
+	if ! git rev-parse --verify "$c" >/dev/null; then
+		printf 'Unknown commit %s\n' "$c"
+		exit 1
+	fi
+	hc+=( "$(git log -1 --format='%h ("%s")' "$c")" )
+	readarray -t -O "${#cc[@]}" cc < <(git log -1 --format="$cformat" "$c" | sort -u)
+done
+hcs=''
+if [ "${#hc[@]}" -gt 1 ]; then
+	hcs='s'
+fi
+
+read -r -a head_branches -p 'HEAD branch(es): '
+
+hb=( "${head_branches[@]/%/,}" )
+hb[-1]=${hb[-1]%,}
+if [ "${#hb[@]}" -gt 2 ]; then
+	hb[-2]=${hb[-2]/%,/ and}
+fi
+hbs=''
+if [ "${#hb[@]}" -gt 1 ]; then
+	hbs='s'
+fi
+
+printf -v subject 'manual merge of the BRANCH tree with the %s tree%s' \
+	"${hb[*]}" "$hbs"
+
+read -r -a merge_commits -p 'MERGE_HEAD commit(s): '
+for c in "${merge_commits[@]}"; do
+	if ! git rev-parse --verify "$c" >/dev/null; then
+		printf 'Unknown commit %s\n' "$c"
+		exit 1
+	fi
+	mc+=( "$(git log -1 --format='%h ("%s")' "$c")" )
+	readarray -t -O "${#cc[@]}" cc < <(git log -1 --format="$cformat" "$c" | sort -u)
+done
+mcs=''
+if [ "${#mc[@]}" -gt 1 ]; then
+	mcs='s'
+fi
+
+printf -v files '  %s\n' "$@"
+conf='a conflict'
+if [ "$#" -gt 1 ]; then
+	conf='conflicts'
+fi
+
+"$tools_dir/message_helper" "${branch[@]}" "$subject" "${cc[@]}" <<EOF
+FIXME: Add owner of second tree to To:
+       Add author(s)/SOB of conflicting commits.
+
+Today's linux-next merge of the BRANCH tree got $conf in:
+
+$files
+between commit$hcs:
+
+$(printf '  %s\n' "${hc[@]}")
+
+from the ${hb[*]} tree$hbs and commit$mcs:
+
+$(printf '  %s\n' "${mc[@]}")
+
+from the BRANCH tree.
+
+I fixed it up (see below) and can carry the fix as necessary. This
+is now fixed as far as linux-next is concerned, but any non trivial
+conflicts should be mentioned to your upstream maintainer when your tree
+is submitted for merging.  You may also want to consider cooperating
+with the maintainer of the conflicting tree to minimise any particularly
+complex conflicts.
+EOF
+
+exit 0

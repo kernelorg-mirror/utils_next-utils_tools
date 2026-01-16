@@ -1,0 +1,238 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+no_build=false
+start_from=""
+
+while getopts 'ns:' opt; do
+	case "$opt" in
+	n)
+		no_build=true
+		;;
+	s)
+		if [ -f "$SHA1_FILE" ]; then
+			printf '%s: %s exists, so -s is invalid\n' "$0" "$SHA1_FILE" 1>&2
+			exit 1
+		fi
+		start_from="$OPTARG"
+		;;
+	*)
+		exit 1
+		;;
+	esac
+done
+shift $((OPTIND - 1))
+
+tools_dir=$(dirname "$0")
+. "$tools_dir/common.sh"
+. "$tools_dir/check_dups.sh"
+
+log()
+{
+	echo "$@" | tee -a "$LOG_FILE"
+}
+
+execute()
+{
+	log '$' "$@"
+	_out="$( "$@" 2>&1 )"
+	_err=$?
+	echo "$_out" | tee -a "$LOG_FILE"
+	return "$_err"
+}
+
+report()
+{
+	if [ -n "$1" ]; then
+		linux-next-notify "$1"
+	fi
+	if [ -n "$2" ]; then
+		printf '%s\n' "$2" 1>&2
+	fi
+}
+
+fix_up()
+{
+	report "$@"
+	if ! bash -i; then
+		exit
+	fi
+}
+
+check_unmerged_files()
+{
+	# "In POSIX sh, 'local' is undefined."
+	# shellcheck disable=SC3043
+	local tree um_files rm_files
+
+	tree="$1"
+
+	um_files=$(git diff 2>&1 | sed -n 's/^\* Unmerged path //p')
+	if [ "$um_files" ] && [ -f "../merge-files/$tree" ]; then
+		rm_files=$(grep -F "$um_files" "../merge-files/$tree")
+		if [ "$rm_files" ]; then
+			"$bin_dir/do_rm" "$rm_files"
+		fi
+	fi
+}
+
+if [ -f "$SHA1_FILE" ]; then
+	previous_tree=$(tail -n1 "$SHA1_FILE" | cut -f1 -d"$_TAB")
+elif [ -z "$start_from" ]; then
+	cp /dev/null "$LOG_FILE"
+	execute date -R
+	execute git checkout master
+	execute git reset --hard stable
+	printf 'Name\t\tSHA1\n----\t\t----\n' > "$SHA1_FILE"
+fi
+
+heads=$(awk -F '\t' '
+	/^#/ { next; }
+	$2=="git" { printf("git/%s/%s ", $3, $5); }
+	$2=="branch" { printf("branch/%s ", $3); }
+	$2=="switch" { printf("switch/%s/%s ", $3, $4); }' "$CTRL_FILE")
+
+need_build=false
+
+for h in $heads; do
+	op=${h%%/*}
+	args=${h#*/}
+	arg1=${args%%/*}
+	arg2=${args#*/}
+
+	if [ -n "$previous_tree" ]; then
+		if [ "$op" = 'git' ] && [ "$arg1" = "$previous_tree" ]; then
+			previous_tree=''
+		fi
+		continue
+	elif [ -n "$start_from" ]; then
+		if [ "$op" = 'git' ] && [ "$arg1" = "$start_from" ]; then
+			start_from=""
+		else
+			continue
+		fi
+	fi
+
+	if [ "$op" = "branch" ]; then
+		git branch -f "$arg1"
+		linux-next-notify "update branch $arg1"
+		continue
+	fi
+
+	if [ "$op" = 'switch' ]; then
+		new_branch=$arg1
+		if [ "$new_branch" = 'master' ]; then
+			old_branch=$(git branch --show-current)
+			if ! [ "$old_branch" = 'master' ]; then
+				if ! git checkout master; then
+					fix_up 'git checkout master failed'
+				fi
+			fi
+		else
+			base=$arg2
+			if ! git checkout -B "$new_branch" "$base"; then
+				fix_up "git checkout $new_branch failed"
+			fi
+		fi
+		continue
+	fi
+
+# $op == "git"
+
+	tree=$arg1
+	branch=$arg2
+	if [ "$branch" = '-' ]; then
+		branch=''
+	fi
+	h="$tree${branch:+/$branch}"
+	hlog=$(git log -1 --oneline "$h") 2>/dev/null
+	old_head=$(git rev-parse HEAD)
+	if [ -f "../pre-merge/$tree" ]; then
+		while read -r p <&7; do
+			if ! "$bin_dir/do_patch" -n "$p"; then
+				fix_up "premerge patch failed"
+			fi 7<&-
+		done 7<"../pre-merge/$tree"
+	fi
+	log Merging "$h" "($hlog)"
+	check_dups "$tree" HEAD "$h" | tee -a "$LOG_FILE"
+	msg=$(printf "Merge branch '%s' of %s" "${branch:-$tree}" "$(get_url "$tree")")
+	if ! execute git merge -m "$msg" "$h"; then
+		echo Merge failed 1>&2
+		echo "$h" >>../merge.debug
+		git diff >>../merge.debug 2>&1
+
+		check_unmerged_files "$tree"
+
+		if git diff 2>&1 | grep -E -q '<<<<<|^\*'; then
+			if [ -f "../merge-fixes/$tree" ]; then
+				echo "Merge fixes exist for this tree:"
+				cat "../merge-fixes/$tree"
+			fi
+			fix_up "new conflict found merging $tree"
+		fi
+#		if [ "$(git status --porcelain)" ]; then
+			if ! execute git commit --no-edit -v -a; then
+				fix_up "next commit failed for $tree"
+			fi
+			execute git diff -M --stat --summary 'HEAD^..'
+#		fi
+	fi
+
+	tab="$_TAB"
+	if [ "${#tree}" -lt 8 ]; then
+		tab="$_TAB$_TAB"
+	fi
+	printf '%s%s%s\n' "$tree" "$tab" "$(git rev-parse "$h^{}")" >> "$SHA1_FILE"
+
+	if [ -f "../merge-fixes/$tree" ]; then
+		while read -r p <&7; do
+			if ! "$bin_dir/merge_fix" -n "$p"; then
+				fix_up "merge fix failed for $tree"
+			fi 7<&-
+		done 7<"../merge-fixes/$tree"
+	fi
+
+	if $no_build; then
+		continue
+	fi
+
+	if ! $need_build; then
+		# See if we need to build after merging this tree
+		if [ -n "$(git diff "$old_head"..)" ]; then
+			need_build=true
+		fi
+	fi
+	if ! $need_build; then
+		continue
+	fi
+
+	if [ "$(get_build_flag "$tree")" != "yes" ]; then
+		if ! [ -f "$top_dir/old-versions/$tree" ]; then
+			continue
+		fi
+	fi
+
+	repo="${build_host:+$build_host:}${build_dir}"
+	if ! git push -f "$repo" HEAD:refs/heads/next; then
+		fix_up "push failed for $tree" "git push failed"
+	fi
+
+	if [ -x "../pre-build/$tree" ] &&
+	   ! "../pre-build/$tree"; then
+		fix_up "pre-build script failed for $tree" "Prebuild script failed"
+	fi
+	if ! "$bin_dir/do_build" "$tree"; then
+		report "build failed for $tree" "Build failed - run do_merge when fixed"
+		exit 1
+	fi
+
+	rm -f "$top_dir/old-versions/$tree"
+
+	need_build=false
+done
+
+exit 0

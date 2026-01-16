@@ -1,0 +1,27 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+w='warning'
+t='this'
+if [ "$1" = '-p' ]; then
+	w='warnings'
+	t='these'
+	shift
+fi
+
+subject="build $w after merge of the BRANCH tree"
+
+tools_dir=$(dirname "$0")
+"$tools_dir"/message_helper "$@" "$subject" <<EOF
+After merging the BRANCH tree, today's linux-next build (KCONFIG_NAME) produced $t $w:
+
+
+Introduced by commit
+
+   ("")
+EOF
+
+exit 0

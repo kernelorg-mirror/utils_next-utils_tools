@@ -1,0 +1,19 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+subject="build failure after merge of the BRANCH tree"
+
+tools_dir=$(dirname "$0")
+"$tools_dir"/message_helper "$@" "$subject" <<EOF
+After merging the BRANCH tree, today's linux-next build (KCONFIG_NAME) failed like this:
+
+
+Caused by commit
+
+   ("")
+EOF
+
+exit 0

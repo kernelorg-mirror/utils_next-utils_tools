@@ -1,0 +1,22 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+. "$(dirname "$0")/common.sh"
+
+rsync -avHPSUXx --open-noatime --delete \
+	--exclude "gitk.cache" \
+	--exclude '.gitk-tmp**' \
+	--include '/duplicates/***' \
+	--include '/fs-common/***' \
+	--include '/fs-next/***' \
+	--include '/old-versions/***' \
+	--include '/patches/***' \
+	--include '/next/***' \
+	--include /SHA1s \
+	--include /merge.log \
+	--include /merge.debug \
+	--exclude '**' \
+	"${build_host}":kernels/next/. ~/kernels/next/.

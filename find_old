@@ -1,0 +1,80 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+. "$(dirname "$0")/common.sh"
+
+find_tag()
+{
+	local i tag
+
+	for i in $(seq 0 60); do
+		tag=$(date --date "$i days ago $1" '+next-%Y%m%d')
+		if git rev-parse -q --verify "$tag" >/dev/null; then
+			break;
+		fi
+	done
+	printf '%s' "$tag"
+}
+
+now=$(find_tag)
+before=$(find_tag "last year")
+
+ts=$(comm -12 <(git show "$before:Next/SHA1s" | tail -n +3 | sort) <(git show "$now:Next/SHA1s" | tail -n +3 | sort))
+
+nts=$(echo "$ts" | wc -l)
+if [ "$nts" -eq 0 ]; then
+	exit 0
+fi
+
+printf 'To: Linux Next Mailing List <linux-next@vger.kernel.org>\n'
+printf 'Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>\n'
+
+for t in $(echo "$ts" | cut -f1); do
+	get_contacts "$t" |
+		sed -E 's/,/\n/g;s/^\s+//gm;s/\s+$//gm'
+done | git check-mailmap --stdin | sort -u | sed 's/^/Cc: /'
+
+printf 'Subject: linux-next: trees being removed\n'
+printf '\n'
+printf 'The following trees are going to be removed from linux-next because they have not been updated in more than a year.  If you want a tree restored, just let me know (and update its branch).\n' | fmt
+printf '\n'
+
+tab="$_TAB$_TAB$_TAB"
+
+printf '%s%s%s\n' 'Tree' "$tab" 'Last commit date'
+printf '  %s\n' 'URL'
+printf '  %s\n' 'comits (if any)'
+printf '%s%s%s\n' '----' "$tab" '----------------'
+
+while read -r t s; do
+	d=$(git log -1 --date=iso --format='%cd' "$s")
+	tab="$_TAB"
+	if [ "${#t}" -lt 16 ]; then
+		tab="$tab$_TAB"
+	fi
+	if [ "${#t}" -lt 8 ]; then
+		tab="$tab$_TAB"
+	fi
+	printf '%s%s%s\n' "$t" "$tab" "$d"
+	printf '  %s#%s\n' "$(cd ../next && get_url "$t")" "$(get_remote_branch "$t")"
+	(
+		if ! cd ../next; then
+			exit
+		fi
+		b="$t/$(get_remote_branch "$t")"
+		ncommits=$(git rev-list --count --no-merges origin/master.."$b")
+		if [ "$ncommits" -eq 0 ]; then
+			exit
+		fi
+		git cherry origin/master "$b" |
+			sed -n 's/^+ //p' |
+			xargs -r -n 1 ../tools/clog
+	)
+done <<EOF
+$ts
+EOF
+
+exit 0

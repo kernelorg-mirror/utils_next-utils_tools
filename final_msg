@@ -1,0 +1,30 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+tools_dir=$(dirname "$0")
+_next_common_no_args=1 . "$tools_dir/common.sh"
+
+to="Linux Next Mailing List <linux-next@vger.kernel.org>"
+cc="Linux Kernel Mailing List <linux-kernel@vger.kernel.org>"
+subject="linux-next: Tree for $(date --date "5 hours ago" '+%b %-d')"
+prev=$(git tag -l next-* | sort | tail -n 2 | head -n 1 | sed 's/next-//')
+nmc=$(git rev-list --no-merges --count origin/master..HEAD^)
+ss=$(git diff --shortstat -M -C origin/master..HEAD^)
+ntrees=$(get_branches '' | wc -l)
+npend=$(get_pending_branches | wc -l)
+# add one for my fixes tree
+npend=$(( npend + 1 ))
+
+sed -i.bak -e 's/^\(Changes since\) [0-9]*:/\1 '"$prev"':/' \
+    -e 's/^\(Non-merge commits .*:\) [0-9]*/\1 '"$nmc"'/'\
+    -e 's/^ *[0-9]* files changed,.*$/'"$ss"'/' \
+    -e 's/^\(I am currently merging\) [0-9]* /\1 '"$ntrees"' /' \
+    -e 's/ [0-9]* \(trees of bug\)/ '"$npend"' \1/' \
+    ../last_msg
+
+"$tools_dir/send_email" "$subject" "$to" "$cc" <../last_msg
+
+exit 0

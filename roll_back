@@ -1,0 +1,56 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+branch="$1"
+if [ -z "$branch" ]; then
+	printf '%s: <branch>\n' "$0" 1>&2
+	exit 1
+fi
+shift
+
+# shellcheck source=./common.sh
+. "$(dirname "$0")/common.sh"
+
+sha=$(sed -En 's/^'"$branch$_TAB"'+(.*)$/\1/p' "$SHA1_FILE")
+if [ -z "$sha" ]; then
+	printf 'No such branch merged: %s\n' "$branch" 1>&2
+	exit 1
+fi
+
+printf -v msg "Merge branch '%s' of %s" "$(get_remote_branch "$branch")" "$(get_url "$branch")"
+
+merge_sha=$(git rev-list -1 -F --grep="$msg" origin/master..)
+if [ -z "$merge_sha" ]; then
+	printf 'No merge of branch %s\n' "$branch" 1>&2
+	exit 1
+fi
+parent=$(git rev-parse --verify "$merge_sha^2")
+if [ "$parent" != "$sha" ]; then
+	printf 'Merge parent is not head of branch (%s v %s)\n' "$parent" "$sha" 1>&2
+	exit 1
+fi
+
+printf 'Old HEAD:\n'
+git log -1 HEAD
+
+printf '\nNew HEAD:\n'
+git log -1 "$merge_sha"
+
+printf '\n'
+read -r -p 'Proceed: (default N): ' answer
+case "$answer" in
+[Yy]*) ;;
+*) exit 1;;
+esac
+
+if ! git reset --hard "$merge_sha"; then
+	exit 1
+fi
+
+sed -i.bak -n "1,/^$branch$_TAB/p" "$SHA1_FILE"
+sed -i.bak -n '1,\|^Merging '"$branch"'/|{p;d};/^Merging/q;p' "$LOG_FILE"
+
+exit 0

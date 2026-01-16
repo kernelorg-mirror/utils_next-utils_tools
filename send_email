@@ -1,0 +1,37 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+mail_dir=$(realpath --relative-to=. "$(dirname "$0")/../mails")
+printf -v TARGET '%s/%(%Y-%m-%d+%s)T.email' "$mail_dir" -1
+
+subject="$1"
+shift
+to="$1"
+shift
+readarray -t cc < <(printf '%s\n' "$@" | sort -u)
+
+for i in "${!cc[@]}"; do
+	e=${cc[$i]##*<}
+	e=${e%%>*}
+	if grep -q -i -F "<$e>" <<<"$to"; then
+		unset "cc[$i]"
+	fi
+done
+
+{
+	printf 'To: %s\n' "$to"
+	if [ "${#cc[@]}" -gt 0 ]; then
+		printf 'Cc: %s\n' "${cc[@]}"
+	fi
+	printf 'Subject: %s\n\n' "$subject"
+	cat
+} > "$TARGET"
+
+gvim "$TARGET"
+
+printf 'When you are finished editing you need to send %s\n' "$TARGET"
+
+exit 0

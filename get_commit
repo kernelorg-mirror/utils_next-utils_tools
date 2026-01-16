@@ -1,0 +1,25 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+commit=
+if [ -n "$1" ]; then
+        commit="$1"
+else
+	printf 'Usage: %s <commit>\n' "$0" 1>&2
+	exit 1
+fi
+
+tools_dir=$(dirname "$0")
+# shellcheck source=./common.sh
+. "$tools_dir/common.sh"
+
+"$tools_dir/clog" "$commit"
+
+git log -1 --format='%aN <%aE>%n%cN <%cE>%n%(trailers:only=no,valueonly,unfold,key=signed-off-by)' "$commit" |
+	sort -u |
+	sed '/^\s*$/d;s/^/Cc: /'
+
+exit 0

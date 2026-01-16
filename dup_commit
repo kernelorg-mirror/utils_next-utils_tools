@@ -1,0 +1,28 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+tools_dir=$(dirname "$0")
+
+subject='duplicate patch in the BRANCH tree'
+obranch="Linus Torvalds'"
+
+if [ "$1" = "-o" ]; then
+	shift
+	obranch="the $1"
+	shift
+fi
+
+body="The following commit is also in $obranch tree as a different commit (but the same patch):"
+
+if [ "$1" = "-p" ]; then
+	shift
+	subject="duplicate patches in the BRANCH tree"
+	body="The following commits are also in $obranch tree as different commits (but the same patches):"
+fi
+
+printf '%s\n' "$body" | fmt | "$tools_dir"/message_helper "$@" "$subject"
+
+exit 0

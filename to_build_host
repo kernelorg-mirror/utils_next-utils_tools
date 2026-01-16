@@ -1,0 +1,22 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+[ -e "SHA1s" ] && {
+	echo "Found SHA1s file ... exitting" 1>&2
+	exit 1
+}
+
+. "$(dirname "$0")/common.sh"
+
+rsync -avHSUXx --open-noatime --delete --delete-excluded \
+	--exclude gitk.cache --exclude /next-history.git --exclude /stats \
+	--exclude '.gitk-tmp**' \
+	--include /next-fixes/.git --include '/next-fixes/.git/**' \
+	--exclude '/next-fixes/**' \
+	--exclude /etc/.git --exclude /tools/.git \
+	--exclude /mails --exclude /quilt --exclude /mmotm \
+	--exclude /last_msg --exclude '/summ*' \
+	~/kernels/next/. "${build_host}":kernels/next/.

@@ -1,0 +1,7 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+diff -u <(sed '/^Merging /s/ (.*$//' summ.old) <(sed '/^Merging /s/ (.*$//' summ)

@@ -1,0 +1,60 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+#
+# Add a repository to linux-next
+#
+# Copyright IBM Corp. 2008,2025
+#
+
+if [ $# -lt 3 ] || [ $# -gt 4 ]; then
+	printf 'usage: %s <contacts> <remote name> <url> [<branch>]\n' "$0" 1>&2
+	printf '       <branch> defaults to "master"\n' 1>&2
+	exit 1
+fi
+
+contacts="$1"
+name="$2"
+url="$3"
+branch="$4"
+
+if [ -z "$contacts" ]; then
+	printf 'Need contacts\n' 1>&2
+	exit 1
+fi
+if [ -z "$name" ]; then
+	printf 'Need a remote name\n' 1>&2
+	exit 1
+fi
+if [ -z "$url" ]; then
+	printf 'Need a URL\n' 1>&2
+	exit 1
+fi
+if [ -z "$branch" ]; then
+	branch='master'
+fi
+
+url=$(printf '%s\n' "$url" | sed -Ee '
+	s,^(git|https)://git.kernel.org/pub/scm/linux/kernel/git/,korg:,
+	s,^(git|https)://git.kernel.org/pub/scm/fs/,korgfs:,
+	s,^https://github.com/,gh:,
+	s,^https://gitlab.freedesktop.org/,gfo:,
+	s,/$,,')
+
+if ! git remote add --no-tags -t "$branch" "$name" "$url"; then
+	exit 1
+fi
+
+cp .git/config ../etc/git-config
+
+if ! cd ../etc; then
+	printf 'Could not chdir to ../etc' 1>&2
+	exit 1
+fi
+
+printf '%s\tgit\t%s\t-\t%s\tno\n' "$contacts" "$name" "$branch" >>control
+
+git diff
+
+printf '\nYou should probably adjust where this tree is listed in the control file\n'
+
+exit 0
