@@ -139,7 +139,12 @@ for c in $commits; do
 			fi
 		fi
 		if [ "$msg" ]; then
-			printf '%s%s%s\n' "$commit_msg" "$fixes_msg" "$msg"
+			to="$($(realpath "$(dirname "$0")")/get_contacts ${tree})"
+			printf '%s%s%s\n' "$commit_msg" "$fixes_msg" "$msg" |
+				$(realpath "$(dirname "$0")")/send_email \
+				"Fixes tags need work in the ${tree} tree" \
+				"${to}" \
+				linux-next@vger.kernel.org linux-kernel@vger.kernel.org
 			commit_msg=''
 		fi
 	done
