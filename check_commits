@@ -10,6 +10,7 @@ if [ "$#" -lt 2 ]; then
 fi
 
 tree=${1}
+to="$($(realpath "$(dirname "$0")")/get_contacts ${tree})"
 shift
 
 commits=$(git rev-list --no-merges "$@")
@@ -40,10 +41,15 @@ print_commits()
 		is='are'
 		its='their'
 	fi
-	printf 'Commit%s\n\n' "$s"
-	git log --no-walk --pretty='format:  %h ("%s")' "$@"
-	printf '\n%s missing a Signed-off-by from %s %s%s.\n\n' \
-		"$is" "$its" "$t" "$s"
+	cat << EOF | $(realpath "$(dirname "$0")")/send_email \
+	  "Missing signoff in the ${tree} tree" "${to}" linux-next@vger.kernel.org linux-kernel@vger.kernel.org
+Commit${s}
+
+$(git log --no-walk --pretty='format:  %h ("%s")' "$@")
+
+${is} missing a Signed-off-by from ${its} ${t}${s}
+EOF
+	sleep 1
 }
 
 check_unexpected_files()
@@ -62,10 +68,17 @@ check_unexpected_files()
 		this='these'
 	fi
 
-	printf 'Commit\n\n'
-	git log --no-walk --pretty='format:  %h ("%s")' "$1"
-	printf '\nadded %s unexpected file%s:\n\n' "$this" "$s"
-	printf '  %s\n' "${files[@]}"
+	cat << EOF | $(realpath "$(dirname "$0")")/send_email \
+	  "Unexpected files in the ${tree} tree" "${to}" linux-next@vger.kernel.org linux-kernel@vger.kernel.org
+Commit${s}
+
+$(git log --no-walk --pretty='format:  %h ("%s")' "$1")
+
+added ${this} unexpected file${s}:
+
+ ${files[@]}
+EOF
+	sleep 1
 }
 
 for c in $commits; do
