@@ -17,7 +17,7 @@ if [ -z "$commits" ]; then
 fi
 
 # This should be a git tree that contains *only* Linus' tree
-Linus_tree="${HOME}/kernels/linus.git"
+Linus_tree="/home/broonie/git/next/linus.git"
 
 split_re='^([Cc][Oo][Mm][Mm][Ii][Tt])?[[:space:]]*([[:xdigit:]]{5,})([[:space:]]*)(.*)$'
 nl=$'\n'
