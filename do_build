@@ -132,7 +132,7 @@ $cmd <<-EOF
 	[ -d \$d ] || mkdir \$d || exit 1
 	log_perf=\$d.log
 
-	if ! /usr/bin/time make -C tools/perf -f Makefile.perf -s -O -j200 O=\$d NO_BPF_SKEL=1 > \$log_perf 2>&1; then
+	if ! /usr/bin/time make -C tools/perf -f Makefile.perf -s -O O=\$d NO_BPF_SKEL=1 > \$log_perf 2>&1; then
 		do_fail perf "\$log_perf"
 	fi
 
