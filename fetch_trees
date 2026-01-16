@@ -85,7 +85,7 @@ for name in $trees; do
 
 	check_dups "$name" origin/master "$new_sha"
 	if ! [ "$new_sha" = "$old_sha" ]; then
-		"$tools_dir"/check_commits ^origin/master "$old_sha..$new_sha"
+		"$tools_dir"/check_commits "$name" ^origin/master "$old_sha..$new_sha"
 	fi
 done
 

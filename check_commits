@@ -4,10 +4,13 @@
 # Copyright IBM Corp. 2008,2025
 #
 
-if [ "$#" -lt 1 ]; then
-	printf 'Usage: %s <commit range>\n' "$0" 1>&2
+if [ "$#" -lt 2 ]; then
+	printf 'Usage: %s <tree> <commit range>\n' "$0" 1>&2
 	exit 1
 fi
+
+tree=${1}
+shift
 
 commits=$(git rev-list --no-merges "$@")
 if [ -z "$commits" ]; then
@@ -15,7 +18,7 @@ if [ -z "$commits" ]; then
 	exit 0
 fi
 
-"$(realpath "$(dirname "$0")")/check_fixes" "$@"
+"$(realpath "$(dirname "$0")")/check_fixes" ${tree} "$@"
 
 declare -a author_missing committer_missing
 

@@ -7,9 +7,12 @@
 shopt -s extglob
 
 if [ "$#" -lt 1 ]; then
-        printf 'Usage: %s <commit range>\n', "$0" 1>&2
+        printf 'Usage: %s <tree> <commit range>\n', "$0" 1>&2
         exit 1
 fi
+
+tree=$1
+shift
 
 commits=$(git rev-list --no-merges -i --grep='^[[:space:]]*Fixes:' "$@")
 if [ -z "$commits" ]; then
