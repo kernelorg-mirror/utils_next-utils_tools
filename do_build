@@ -31,6 +31,8 @@ else
 fi
 obdir="$bparent/old/$tree"
 
+kselftest_targets=$(echo $(cat ../etc/kselftest-targets))
+
 cmd="/bin/sh"
 if [ "$build_host" ]; then
 	cmd="ssh -T $build_host"
@@ -161,6 +163,23 @@ $cmd <<-EOF
 	fi
 
 	show_log arm multi_v7_defconfig \$log_arm
+
+	echo Building: arm64 kselftest
+	d="$bparent/arm64_kselftest"
+	# I do not trust the kselftest build system to do deps
+	rm -rf \$d
+	[ -d \$d ] || mkdir \$d || exit 1
+	log_kselftest=\$d.log
+	make -j${j_factor} ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- O=\$d -s headers_install || exit 1
+
+	if ! /usr/bin/time make -j200 ARCH=arm64 -C tools/testing/selftests TARGETS="${kselftest_targets}" FORCE_TARGETS=1 CROSS_COMPILE=aarch64-linux-gnu- KBUILD_OUTPUT=\$d O=\$d -O -s > \$log_kselftest 2>&1; then
+		do_fail 'arm64 kselftest' "\$log_kselftest"
+	fi
+	# headers_install pollutes the tree for generated files :(
+	git clean -d -x -f
+	touch .scmversion || exit 1
+
+	show_log arm64 kselftest \$log_kselftest
 
 	echo Building: x86_64 allmodconfig
 	d="$bparent/x86_64_allmodconfig"
