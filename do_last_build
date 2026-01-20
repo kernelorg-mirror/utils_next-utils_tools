@@ -14,6 +14,8 @@ cmd="/bin/sh"
 
 j1_factor=$(( j_factor / 2 ))
 
+git push -f ${NEXT_BUILD_HOST}:${NEXT_BUILD_DIR} HEAD:refs/heads/next
+
 $cmd <<-EOF
 	set -e
 
@@ -26,6 +28,8 @@ $cmd <<-EOF
 	export TMPDIR="${build_dir%/*}/tmp"
 
 	touch .scmversion
+
+	git reset --hard next || exit 1
 
 	g=../global.except
 	if [ -r \$g ]; then

@@ -33,6 +33,8 @@ obdir="$bparent/old/$tree"
 
 kselftest_targets=$(echo $(cat ../etc/kselftest-targets))
 
+git push -f ${NEXT_BUILD_HOST}:${NEXT_BUILD_DIR} HEAD:refs/heads/next
+
 cmd="/bin/sh"
 if [ "$build_host" ]; then
 	cmd="ssh -T $build_host"
