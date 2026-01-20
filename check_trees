@@ -1,0 +1,16 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright Arm, Ltd 2026
+#
+
+tools_dir=$(dirname "$0")
+. "$tools_dir/common.sh" ''
+
+trees=$(get_branches)
+
+for tree in ${trees} ; do
+	branch=$(get_remote_branch "${tree}")
+	echo ${tree} ${branch}
+	../tools/check_commits ${tree} origin/master..${tree}/${branch}
+done
