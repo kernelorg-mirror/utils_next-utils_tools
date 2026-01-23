@@ -239,7 +239,12 @@ for h in $heads; do
 		exit 1
 	fi
 
-	rm -f "$top_dir/old-versions/$tree"
+	if [ -f "$top_dir/old-versions/$tree" ]; then
+		echo The ${tree} lost it\'s build failure. >> ../updates
+		echo >> ../updates
+		rm -f "$top_dir/old-versions/$tree"
+	fi
+
 	if [ -f ../unbuilt ]; then
 		rm ../unbuilt
 		touch ../unbuilt
