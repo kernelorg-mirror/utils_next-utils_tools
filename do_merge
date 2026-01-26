@@ -203,10 +203,10 @@ for h in $heads; do
 	fi
 
 	# See if we need to build after merging this tree
-	if [ "$(get_build_flag "$tree")" != "yes" ]; then
+	if [ "$(get_build_flag "$tree")" = "yes" ]; then
 		need_build=true
 	fi
-	if ! [ -f "$top_dir/old-versions/$tree" ]; then
+	if [ -f "$top_dir/old-versions/$tree" ]; then
 		need_build=true
 	fi
 
