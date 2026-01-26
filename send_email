@@ -22,6 +22,9 @@ for i in "${!cc[@]}"; do
 done
 
 {
+	if [ "${NEXT_EMAIL}" != "" ] ; then
+		printf 'From: %s <%s>\n' "${NEXT_NAME}" "${NEXT_EMAIL}"
+	fi
 	printf 'To: %s\n' "$to"
 	if [ "${#cc[@]}" -gt 0 ]; then
 		printf 'Cc: %s\n' "${cc[@]}"
