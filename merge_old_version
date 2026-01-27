@@ -102,6 +102,8 @@ if ! "$bin_dir/do_build" "$tree"; then
 	bash -i || exit
 fi
 
+echo -n > ${top_dir}/unbuilt
+
 printf '%s\n' "$ver" >"$top_dir/old-versions/$tree"
 
 exit 0
