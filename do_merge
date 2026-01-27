@@ -30,7 +30,7 @@ tools_dir=$(dirname "$0")
 . "$tools_dir/common.sh"
 . "$tools_dir/check_dups.sh"
 
-touch ../unbuilt
+touch ${top_dir}/unbuilt
 
 log()
 {
@@ -211,12 +211,12 @@ for h in $heads; do
 	fi
 
 	# Ensure we build periodically so we're not lost on failure
-	if [ $(wc -l ../unbuilt | cut -f1 -d\ ) -gt 50 ]; then
+	if [ $(wc -l ${top_dir}/unbuilt | cut -f1 -d\ ) -gt 50 ]; then
 		need_build=true
 	fi
 
 	if ! $need_build; then
-		echo ${tree} >> ../unbuilt
+		echo ${tree} >> ${top_dir}/unbuilt
 		continue
 	fi
 
@@ -245,9 +245,8 @@ for h in $heads; do
 		rm -f "$top_dir/old-versions/$tree"
 	fi
 
-	if [ -f ../unbuilt ]; then
-		rm ../unbuilt
-		touch ../unbuilt
+	if [ -f ${top_dir}/unbuilt ]; then
+		echo -n > ${top_dir}/unbuilt
 	fi
 
 	need_build=false
