@@ -37,4 +37,6 @@ gvim "$TARGET"
 
 printf 'When you are finished editing you need to send %s\n' "$TARGET"
 
+sleep 1
+
 exit 0
