@@ -195,6 +195,23 @@ $cmd <<-EOF
 
 	show_log arm64 kselftest \$log_kselftest
 
+	echo Building: arm64 kunit
+	d="$bparent/arm64_kunit"
+	[ -d \$d ] || mkdir \$d || exit 1
+	log_kunit=\$d.log
+	json_kunit=\$d.json
+	if ! ./tools/testing/kunit/kunit.py run --build_dir \$d --arch arm64 --cross_compile=aarch64-linux-gnu- --json="\$json_kunit" > \$log_kunit 2>&1 ; then
+		echo kunit run failed
+		do_fail 'arm64 kunit' "\$log_kunit"
+	fi
+
+	if [ "\$(jq '[.misc.failed, .misc.crashed, .misc.errors] | add' < "\$json_kunit")" != "0" ]; then
+		echo kunit test failed
+		echo do_fail 'arm64 kunit' "\$log_kunit"
+	fi
+
+	show_log arm64 kunit \$log_kunit
+
 	echo Building: x86_64 allmodconfig
 	d="$bparent/x86_64_allmodconfig"
 	[ -d \$d ] || mkdir \$d || exit 1
