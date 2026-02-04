@@ -216,12 +216,10 @@ for h in $heads; do
 	fi
 
 	if ! $need_build; then
-		echo ${tree} >> ${top_dir}/unbuilt
-		continue
-	fi
-
-	# Special case, skip trees unchanged since the last time
-	if [ -n "$(git diff "$old_head"..)" ]; then
+		# Skip trees unchanged since the last time
+		if [ -n "$(git diff "$old_head"..)" ]; then
+			echo ${tree} >> ${top_dir}/unbuilt
+		fi
 		continue
 	fi
 
