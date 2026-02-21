@@ -1,0 +1,98 @@
+#!/bin/bash -e
+#
+# Copyright 2026 Arm, Ltd
+
+REPORT=HEAD
+BASELINE=${1}
+
+. ../tools/common.sh
+
+MSG=$(mktemp)
+trap "rm -f -- '${MSG}'" EXIT
+REPORT_SHA1s=$(mktemp)
+trap "rm -f -- '${REPORT_SHA1s}'" EXIT
+SIGNOFF=$(mktemp)
+trap "rm -f -- '${SIGNOFF}'" EXIT
+BASELINE_SHA1s=$(mktemp)
+trap "rm -f -- '${BASELINE_SHA1s}'" EXIT
+
+# Should we have files with annotations?
+if [ ! -z "$(ls ${top_dir}/old-versions)" ]; then
+	echo Trees being held at old versions: >> ${MSG}
+	echo >> ${MSG}
+	for t in $(ls ${top_dir}/old-versions) ; do
+		printf "  %-15s\t%s\n" \
+			${t} $(cat ${top_dir}/old-versions/${t}) >> ${MSG}
+	done
+else
+	echo No trees are held at old versions >> ${MSG}
+fi
+echo >> ${MSG}
+
+# Remove header and origin tree
+git show ${REPORT}:Next/SHA1s | tail +4 > ${REPORT_SHA1s}
+if [ "${BASELINE}" != "" ]; then
+	git show ${BASELINE}:Next/SHA1s | tail +4 > ${BASELINE_SHA1s}
+fi
+
+cat ${REPORT_SHA1s} | while read -r line ; do
+	t=$(echo ${line} | cut -f1 -d\ )
+	h=$(echo ${line} | cut -f2 -d\ )
+
+	commits=$(git rev-list --no-merges origin/master..${h})
+	for c in ${commits} ; do
+	        ae=$(git log -1 --format='<%ae>%n<%aE>%n %an %n %aN ' "$c" |
+			sort -u)
+	        ce=$(git log -1 --format='<%ce>%n<%cE>%n %cn %n %cN ' "$c" |
+			sort -u)
+	        sob=$(git log -1 --format='%b' "$c" |
+			sed -En 's/^\s*Signed-off-by:?\s*/ /ip')
+		if ! grep -i -F -q "$ae" <<<"$sob"; then
+			printf "\t${t}\t(missing author)\n"
+		fi
+		if ! grep -i -F -q "$ce" <<<"$sob"; then
+			printf "  ${t}\t(missing committer)\n"
+		fi
+	done
+done | sort -u >> ${SIGNOFF}
+
+if [ -s ${SIGNOFF} ]; then
+	echo Trees with signoff problems: >> ${MSG}
+	echo >> ${MSG}
+	cat ${SIGNOFF} >> ${MSG}
+else
+	echo No trees have signoff problems >> ${MSG}
+fi
+echo >> ${MSG}
+
+echo "Non-merge commits relative to Linus' tree: $(git rev-list --no-merges --count origin/master..${REPORT}^)" >> ${MSG}
+echo "$(git diff --shortstat -M -C origin/master..${REPORT}^)" >> ${MSG}
+echo >> ${MSG}
+
+count_tree_commits()
+{
+	SHA1s=${1}
+
+	awk 'BEGIN { prev = "" }
+	     {  tree = $1
+		 sha = $2
+	         cmd = "git rev-list --count --no-merges origin/master.." sha " " prev
+	         cmd | getline count
+		 close(cmd)
+	         prev = "^" sha " " prev
+	         print "  " count "\t" tree
+	}' ${SHA1s} | sort -nr | head -5 >> ${MSG}
+}
+
+echo Top trees adding commits to -next: >> ${MSG}
+echo >> ${MSG}
+count_tree_commits ${REPORT_SHA1s}
+
+if [ "${BASELINE}" != "" ]; then
+	echo >> ${MSG}
+	echo Top trees with commits in ${BASELINE} that didn\'t get merged: >> ${MSG}
+	echo >> ${MSG}
+	count_tree_commits ${BASELINE_SHA1s}
+fi
+
+cat ${MSG}
