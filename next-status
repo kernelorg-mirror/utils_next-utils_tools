@@ -72,6 +72,7 @@ echo >> ${MSG}
 count_tree_commits()
 {
 	SHA1s=${1}
+	COUNT=${2}
 
 	awk 'BEGIN { prev = "" }
 	     {  tree = $1
@@ -81,18 +82,18 @@ count_tree_commits()
 		 close(cmd)
 	         prev = "^" sha " " prev
 	         print "  " count "\t" tree
-	}' ${SHA1s} | sort -nr | head -5 >> ${MSG}
+	}' ${SHA1s} | sort -nr | head -${COUNT} >> ${MSG}
 }
 
 echo Top trees adding commits to -next: >> ${MSG}
 echo >> ${MSG}
-count_tree_commits ${REPORT_SHA1s}
+count_tree_commits ${REPORT_SHA1s} 5
 
 if [ "${BASELINE}" != "" ]; then
 	echo >> ${MSG}
 	echo Top trees with commits in ${BASELINE} that didn\'t get merged: >> ${MSG}
 	echo >> ${MSG}
-	count_tree_commits ${BASELINE_SHA1s}
+	count_tree_commits ${BASELINE_SHA1s} 10
 fi
 
 cat ${MSG}
