@@ -221,6 +221,9 @@ $cmd <<-EOF
 	if ! /usr/bin/time make ARCH=x86_64 CROSS_COMPILE=x86_64-linux-gnu- O=\$d -j200 -O -s > \$log_x86 2>&1; then
 		do_fail "x86_64 allmodconfig" "\$log_x86"
 	fi
+	if ! /usr/bin/time make ARCH=x86_64 CROSS_COMPILE=x86_64-linux-gnu- O=\$d -j200 -O -s rustfmtcheck >> \$log_x86 2>&1; then
+		do_fail "x86_64 allmodconfig rustfmtcheck" "\$log_x86"
+	fi
 
 	show_log x86_64 allmodconfig \$log_x86
 
