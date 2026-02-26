@@ -226,3 +226,5 @@ $cmd <<-EOF
 
 	rm .scmversion
 EOF
+
+echo -n > ../unbuilt
