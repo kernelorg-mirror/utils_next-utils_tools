@@ -200,7 +200,7 @@ $cmd <<-EOF
 	[ -d \$d ] || mkdir \$d || exit 1
 	log_kunit=\$d.log
 	json_kunit=\$d.json
-	if ! ./tools/testing/kunit/kunit.py run --kconfig_add CONFIG_RUST=y --build_dir \$d --arch arm64 --cross_compile=aarch64-linux-gnu- --json="\$json_kunit" > \$log_kunit 2>&1 ; then
+	if ! ./tools/testing/kunit/kunit.py run --alltests --kconfig_add CONFIG_RUST=y --build_dir \$d --arch arm64 --cross_compile=aarch64-linux-gnu- --json="\$json_kunit" > \$log_kunit 2>&1 ; then
 		echo kunit run failed
 		do_fail 'arm64 kunit' "\$log_kunit"
 	fi
