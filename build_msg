@@ -4,12 +4,27 @@
 # Copyright IBM Corp. 2008,2025
 #
 
+# shellcheck source=common.sh
+. "$(dirname "$0")/common.sh"
+
+bparent=$(dirname "$build_dir")
+
 subject="build failure after merge of the BRANCH tree"
+
+RLOGFILE=$(ssh ${NEXT_BUILD_HOST} ls ${bparent}/*.log)
+LOGFILE=$(echo ${RLOGFILE} | sed s,${bparent}/,,)
+
+# TBD: we will need to special case kunit and kselftest
+
+KCONFIG=$(echo ${LOGFILE} | sed s/.*_// | sed s/.log//)
+ARCH=$(echo ${LOGFILE} | sed s/_${KCONFIG}.log//)
+BUILD_NAME="${ARCH} ${KCONFIG}"
 
 tools_dir=$(dirname "$0")
 "$tools_dir"/message_helper "$@" "$subject" <<EOF
-After merging the BRANCH tree, today's linux-next build (KCONFIG_NAME) failed like this:
+After merging the BRANCH tree, today's linux-next build (${BUILD_NAME}) failed like this:
 
+$(ssh ${NEXT_BUILD_HOST} cat ${RLOGFILE})
 
 Caused by commit
 
