@@ -246,7 +246,7 @@ for h in $heads; do
 	fi
 
 	if [ -f "$top_dir/old-versions/$tree" ]; then
-		echo The ${tree} lost it\'s build failure. >> ../updates
+		echo The ${tree} tree lost it\'s build failure. >> ../updates
 		echo >> ../updates
 		rm -f "$top_dir/old-versions/$tree"
 	fi
