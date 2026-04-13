@@ -198,6 +198,14 @@ for h in $heads; do
 		done 7<"../merge-fixes/$tree"
 	fi
 
+	if [ -f "../bug-fixes/$tree" ]; then
+		while read -r p <&7; do
+			if ! git am --signoff -n "$p"; then
+				fix_up "bug fix failed for $tree"
+			fi 7<&-
+		done 7<"../bug-fixes/$tree"
+	fi
+
 	if $no_build; then
 		continue
 	fi
