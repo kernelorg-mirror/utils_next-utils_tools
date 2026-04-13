@@ -1,0 +1,83 @@
+SPDX-License-Identifier: GPL-2.0
+Copyright IBM Corp. 2008,2026
+
+These are the tools used to build and release linux-next.
+
+Environment variables:
+
+NEXT_SIGNING_KEY	(required) the GPG key used to sign the
+	release tag
+NEXT_KUP_KEY		(required) the GPG key used when uploading
+	the patch file to kernel.org
+NEXT_BUILD_HOST		the host where builds take place (may be
+	emtpy for the curent host)
+NEXT_BUILD_DIR		the directory where builds take place (defaults
+	to $HOME/next/next)
+
+Expected code layout:
+
+$top_dir/
+	duplicates/	lists of duplicate commits per tree
+		relative to Linus' tree and the earlier
+		part of the current linuc-next tree
+	etc/	the control file and a copy of the git
+		config from the next directory
+	mails/	used to store temporary files when mails
+		are being contructed
+	merge-files/	per tree lists of files to be removed
+		during merges
+	merge-fixes/	per tree lists of latches to be
+		applied during merges
+	next/	the current and past 3 months linux-next trees
+	next-history.git/	all the past linux-next trees
+	old-version/	the last working version of trees
+		that are currently failing to build
+	parches/	patches listed in merge-fixes
+	pre-build/	per tree scripts to run after merging
+		but before building
+	pre-merge/	like merge-fixes, but patches are
+		applied before mergin the tree
+	stats/	temporary staorage used by do_stats
+
+$bin_dir/	contains the scripts and some common included
+	scripts
+
+bin_dir is determined to be the directory of the script being run
+	(in commond.sh)
+top_dir is set to the parent of the current directory when a script
+	is run.
+
+The main scripts are run from next/.
+
+A pristine (most likely a mirror and bare) copy of Linus' repository is
+expected to be available.  It should only contain Linus' master branch
+and tags related to that branch.  It should be referenced from the next/
+git config.  It is also used by the check_fixes and setup_build scripts.
+
+The fields of the control file ($top_dir/etc/control) are TAB spearated.
+They are:
+	contacts	comma separated email addresses to be
+		notified of problems with the tree
+	type	"git" for normal tree lines
+		"switch" to change to another branch
+		"branch" to create a branch at this point
+	name	the name of the tree for reporting
+	unused	used to be the URL for the tree, but that is now
+		only in the git configuration
+	branch	the branch name for this tree
+	build_flag	should a build be performed after merging
+		this tree?
+
+Build arena set up:
+
+The build directory contains:
+
+$build_dir/
+	next/	the copy of the $top_dir/next directory being build
+	old/	old build results
+	tmp/	TMP_DIR an be set to here if useful
+It also has one directory for each build that is done.  These can be
+deleted at the end of eahc day.
+
+The $build_dir can be on the same machine as the merges are done, or on
+another machine sepcified by the environment variable NEXT_BUILD_HOST.
