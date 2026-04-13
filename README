@@ -1,7 +1,9 @@
 SPDX-License-Identifier: GPL-2.0
 Copyright IBM Corp. 2008,2026
 
-These are the tools used to build and release linux-next.
+These are the tools used to build and release linux-next, additional
+data files are needed to actually run the merge (control, patch files
+for semantic fixups, the rr-cache).
 
 Environment variables:
 
@@ -13,6 +15,8 @@ NEXT_BUILD_HOST		the host where builds take place (may be
 	emtpy for the curent host)
 NEXT_BUILD_DIR		the directory where builds take place (defaults
 	to $HOME/next/next)
+NEXT_EMAIL		username to use for emails
+NEXT_NAME		name to use for emails
 
 Expected code layout:
 
@@ -81,3 +85,59 @@ deleted at the end of eahc day.
 
 The $build_dir can be on the same machine as the merges are done, or on
 another machine sepcified by the environment variable NEXT_BUILD_HOST.
+
+The build machine is currently an arm64 Debian Trixie machine with these
+packages:
+
+        git build-essential gawk u-boot-tools clang
+        gcc-x86-64-linux-gnu
+        gcc-x86-64-linux-gnux32
+        gcc-aarch64-linux-gnu
+        gcc-sparc-linux-gnu
+        gcc-s390x-linux-gnu
+        gcc-arm-linux-gnueabihf
+        rsync
+        qemu-system
+        rustc rust-src bindgen rustfmt rust-clippy
+        bison flex libelf-dev libssl-dev bc default-jdk
+        libcap-dev libdw-dev libgtk2.0-dev binutils-dev
+        libiberty-dev libperl-dev libslang2-dev libunwind-dev
+        liblzma-dev default-jre time python3-dev libzstd-dev
+        libnuma-dev libbabeltrace-ctf-dev libaudit-dev
+        libkeyutils-dev keyutils libtraceevent-dev libpfm4-dev
+        libcapstone-dev llvm-dev systemtap-sdt-dev python3-setuptools
+        python3-sphinx graphviz jq
+
+installed.
+
+Running
+
+In the next/ directory run:
+
+   ../tools/setup_build
+   ../tools/fetch_trees
+   ../tools/do_merge
+   ../tools/do_last_build
+   ../tools/make_tree_file
+   ../tools/final_msg
+
+For final_msg you should add ../updates to the message and send.
+
+On a Monday I also run ../tools/next-status and use that to write a mail
+to Linus and the lists with a bit of editorialising about how things
+are ("-next status as at vX.Y-rcN").
+
+For a conflict do_merge will drop you into a shell to resolve the
+conflict, when you exit the shell it will commit what's there and
+carry on.  Use ../tools/merge_msg to generate a mail about it.
+
+For a build failure do_merge will edit completely.  We currently only
+build a subset of merges, the unbuilt ones are listed in ../unbuilt.  At
+the minute it's a list of trees likely to be important or have issues,
+any tree where we are merging an old version or every 50 trees.  You can
+use ../tools/roll_back <tree> to unwind the merge to the specified tree,
+../tools/do_build to do a build and ../tools/build_msg to report an
+error (this will grab logs from the build host).  
+
+Mails will be dropped into ../mails with an editor open - you can copy
+these into a Maildir's new folder.
