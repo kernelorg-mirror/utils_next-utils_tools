@@ -45,9 +45,9 @@ $cmd <<-EOF
 	if [ -r \$g ]; then
 		cat \$g >>\$e
 	fi
-	KCONFIG_ALLCONFIG=\$e make ARCH=arm64 -s O=\$d allyesconfig
+	KCONFIG_ALLCONFIG=\$e make ARCH=arm64 -s O=\$d CLIPPY=1 allyesconfig
 	printf 'Backgrouding the %s build\n' 'arm64_allyesconfig'
-	make ARCH=arm64 O=\$d -j$j_factor -O -s -k >\$d.log 2>&1 </dev/null &
+	make ARCH=arm64 O=\$d CLIPPY=1 -j$j_factor -O -s -k >\$d.log 2>&1 </dev/null &
 
 	echo Building: x86_64 modules_install
 	INSTALL_MOD_PATH="${build_dir%/*}" /usr/bin/time make ARCH=x86_64 CROSS_COMPILE=x86_64-linux-gnu- O=../x86_64_allmodconfig -j$j1_factor -O -s modules_install
