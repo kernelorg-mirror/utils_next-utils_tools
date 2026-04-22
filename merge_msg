@@ -13,6 +13,7 @@ fi
 gitk --merge -- "$@" &
 
 tools_dir=$(dirname "$0")
+top_dir=${tools_dir}/..
 
 hc=()
 mc=()
@@ -46,6 +47,8 @@ if [ "${#hb[@]}" -gt 1 ]; then
 fi
 
 printf -v subject 'manual merge of the BRANCH tree with the %s tree%s' \
+	"${hb[*]}" "$hbs"
+printf -v update 'The BRANCH tree acquired a conflict with the %s tree%s'. \
 	"${hb[*]}" "$hbs"
 
 read -r -a merge_commits -p 'MERGE_HEAD commit(s): '
@@ -92,5 +95,8 @@ is submitted for merging.  You may also want to consider cooperating
 with the maintainer of the conflicting tree to minimise any particularly
 complex conflicts.
 EOF
+
+echo >> ${top_dir}/updates
+echo ${update} >> ${top_dir}/updates
 
 exit 0
