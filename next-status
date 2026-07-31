@@ -87,7 +87,12 @@ count_tree_commits()
 
 echo Top trees adding commits to -next: >> ${MSG}
 echo >> ${MSG}
-count_tree_commits ${REPORT_SHA1s} 5
+count_tree_commits ${REPORT_SHA1s} 10
+
+echo >> ${MSG}
+echo Trees adding duplicate commits to -next: >> ${MSG}
+(cd ../duplicates/next ; wc -l --total=never *
+ cd ../linus ; wc -l --total=never * ) | sort -nr >> ${MSG}
 
 if [ "${BASELINE}" != "" ]; then
 	echo >> ${MSG}
